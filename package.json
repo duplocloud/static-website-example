@@ -1,0 +1,25 @@
+{
+  "name": "static-website-example",
+  "version": "1.0.0",
+  "description": "A simple static website to showcase deployments. ",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo hello"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/duplocloud/static-website-example.git"
+  },
+  "keywords": [
+    "static",
+    "website",
+    "cloudfront",
+    "s3"
+  ],
+  "author": "DuploCloud",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/duplocloud/static-website-example/issues"
+  },
+  "homepage": "https://github.com/duplocloud/static-website-example#readme"
+}

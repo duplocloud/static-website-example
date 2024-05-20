@@ -1,0 +1,96 @@
+name: Build and Deploy
+
+on:
+
+  # run the workflow manually
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy to
+        required: true
+        default: dev01
+        type: environment
+
+  # allow resuse of this workflow
+  workflow_call:
+    inputs:
+      environment:
+        description: Environment to deploy to
+        required: true
+        default: dev01
+        type: string
+
+  # Trigger the deploy when main branch is updated
+  push:
+    branches:
+    - main
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment || 'dev01' }}
+      url: ${{ inputs.environment || 'dev01' }}.myportal.duplocloud.net
+    env:
+      DUPLO_HOST: ${{ vars.DUPLO_HOST }}
+      DUPLO_TOKEN: ${{ secrets.DUPLO_TOKEN }}
+      DUPLO_TENANT: ${{ inputs.environment || 'dev01' }}
+      WEBSITE_NAME: my-static-site
+    steps:
+
+    # Clone the repo to the runners workspace
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    # Install nodejs and configure cahing
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "20.2.0"
+        cache: "npm"
+
+    # setup duplo and aws
+    - name: Duplo Setup
+      uses: duplocloud/actions/setup@main
+
+    # Install dependencies using ci command so the lock files is used
+    - name: Install
+      run: npm ci
+
+    # Run the static site generator
+    - name: Build project
+      env:
+        NODE_ENV: production
+      run: npm run build
+
+    # Run your custom tests
+    - name: Test
+      run: npm test
+    
+    # Apply static configuration for this environment from ssm
+    - name: Apply SSM Config
+      run: >-
+        aws ssm get-parameter 
+        --name "/${DUPLO_TENANT}/web-config" 
+        --query "Parameter.Value" 
+        --output text >> ./build/config.json
+
+    # Sync the entire build folder to the s3 bucket
+    - name: Sync to S3
+      env:
+        BUCKET: duploservices-${DUPLO_TENANT}-${WEBSITE_NAME}-${DUPLO_ACCOUNT_ID}
+      run: aws s3 sync build/ "s3://$BUCKET/" --delete
+
+    # Invalidate the cloudfront cache so your changes you just made are visible
+    - name: Invalidate Cache
+      env:
+        DISTRIBUTION: duploservices-${DUPLO_TENANT}-${WEBSITE_NAME}
+      run: |
+
+        dist_id="$(aws cloudfront list-distributions \
+          --query "DistributionList.Items[?Comment == '${DISTRIBUTION}'].Id" \
+          --output text)"
+
+        aws cloudfront create-invalidation \
+          --distribution-id $dist_id \
+          --paths "/*"
