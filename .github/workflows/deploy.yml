@@ -57,6 +57,10 @@ jobs:
     - name: Install
       run: npm ci
 
+    # run the npm audit on dependencies
+    - name: Audit
+      run: npm audit
+
     # Run the static site generator
     - name: Build project
       env:
@@ -78,13 +82,13 @@ jobs:
     # Sync the entire build folder to the s3 bucket
     - name: Sync to S3
       env:
-        BUCKET: duploservices-${DUPLO_TENANT}-${WEBSITE_NAME}-${DUPLO_ACCOUNT_ID}
+        BUCKET: duploservices-${{ env.DUPLO_TENANT }}-${{ env.WEBSITE_NAME }}-${{ env.DUPLO_ACCOUNT_ID }}
       run: aws s3 sync build/ "s3://$BUCKET/" --delete
 
     # Invalidate the cloudfront cache so your changes you just made are visible
     - name: Invalidate Cache
       env:
-        DISTRIBUTION: duploservices-${DUPLO_TENANT}-${WEBSITE_NAME}
+        DISTRIBUTION: duploservices-${{ env.DUPLO_TENANT }}-${{ env.WEBSITE_NAME }}
       run: |
 
         dist_id="$(aws cloudfront list-distributions \
